@@ -1,6 +1,6 @@
 # FitLog
 
-FitLog is a dark, no-nonsense workout library and training log for choosing lifts, building today's plan, and tracking weekly effort.
+FitLog is a  workout library and training log for choosing workouts, building today's plan, and tracking weekly effort.
 
 ## Technologies
 
@@ -18,11 +18,5 @@ FitLog is a dark, no-nonsense workout library and training log for choosing lift
 - Live plan metrics, five-lift workflow, done and remove actions
 - Toast feedback, loading state, responsive navigation, and custom 404 page
 
-## Run locally
-
-```bash
-pnpm install
-pnpm dev
-```
 
 FitLog is designed for deployment to Vercel or any Next.js-compatible host.
