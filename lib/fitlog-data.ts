@@ -14,6 +14,10 @@ export type Workout = {
   instructions: string[]
 }
 
+export function slugifyWorkout(name: string): string {
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
 const workoutImages: Record<string, string> = {
   'Barbell Bench Press': '/images/workout-bench-press.png',
   'Pull-Up': '/images/workout-pullup.png',
@@ -34,7 +38,9 @@ const workoutImages: Record<string, string> = {
 
 export const fallbackWorkouts: Workout[] = [
   ['Barbell Bench Press',['CHEST','ARMS'],'Barbell, Bench','Intermediate',4,'6-8',25,180,4.8],['Pull-Up',['BACK','ARMS'],'Pull-up Bar','Advanced',4,'6-10',20,140,4.9],['Back Squat',['LEGS','GLUTES'],'Barbell, Rack','Advanced',4,'6-8',30,240,4.8],['Overhead Press',['SHOULDERS','ARMS'],'Barbell','Intermediate',3,'8-10',20,150,4.7],['Bicep Curl',['ARMS'],'Dumbbells','Beginner',3,'10-12',15,90,4.6],['Tricep Pushdown',['ARMS'],'Cable Machine','Beginner',3,'10-12',15,85,4.7],['Hollow-Body Plank',['CORE'],'Bodyweight','Intermediate',3,'30 sec',12,70,4.5],['Dumbbell Kick Curl',['ARMS'],'Dumbbells','Beginner',3,'10-12',15,90,4.6],['Conventional Deadlift',['BACK','LEGS'],'Barbell','Advanced',4,'5-6',28,260,4.9],['Push-Up',['CHEST','ARMS'],'Bodyweight','Beginner',3,'12-15',12,80,4.5],['Walking Lunge',['LEGS','GLUTES'],'Dumbbells','Intermediate',3,'10 / leg',18,130,4.7],['Russian Twist',['CORE'],'Medicine Ball','Intermediate',3,'16-20',14,95,4.6],
-].map((x, i) => ({id: String(i+1), name:x[0] as string, category:x[1] as string[], equipment:x[2] as string, difficulty:x[3] as string, sets:x[4] as number, reps:x[5] as string, duration:x[6] as number, calories:x[7] as number, rating:x[8] as number, image: workoutImages[x[0] as string] ?? '/images/workout-strength.png', description:'A focused movement built to develop strength, control, and repeatable training progress.', instructions:['Set your stance and prepare the equipment with control.','Brace your core and move through a steady range of motion.','Keep your form consistent through every repetition.','Return slowly, breathe, and reset before the next rep.']}))
+].map((x) => ({id: slugifyWorkout(x[0] as string), name:x[0] as string, category:x[1] as string[], equipment:x[2] as string, difficulty:x[3] as string, sets:x[4] as number, reps:x[5] as string, duration:x[6] as number, calories:x[7] as number, rating:x[8] as number, image: workoutImages[x[0] as string] ?? '/images/workout-strength.png', description:'A focused movement built to develop strength, control, and repeatable training progress.', instructions:['Set your stance and prepare the equipment with control.','Brace your core and move through a steady range of motion.','Keep your form consistent through every repetition.','Return slowly, breathe, and reset before the next rep.']}))
+
+const canonicalOrder = new Map(fallbackWorkouts.map((workout, index) => [workout.id, index]))
 
 export function normalizeWorkouts(data: unknown): Workout[] {
   if (!Array.isArray(data)) return fallbackWorkouts
@@ -42,33 +48,44 @@ export function normalizeWorkouts(data: unknown): Workout[] {
   const normalized = data.map((item, index) => {
     if (Array.isArray(item)) {
       const [name, category, equipment, difficulty, sets, reps, duration, calories, rating] = item
+      const resolvedName = typeof name === 'string' ? name : `Workout ${index + 1}`
       return {
-        ...fallbackWorkouts[index % fallbackWorkouts.length],
-        id: String(index + 1),
-        name: typeof name === 'string' ? name : `Workout ${index + 1}`,
-        category: Array.isArray(category) ? category.filter((value): value is string => typeof value === 'string') : [],
-        equipment: typeof equipment === 'string' ? equipment : 'Bodyweight',
-        difficulty: typeof difficulty === 'string' ? difficulty : 'Intermediate',
-        sets: Number(sets) || 3,
-        reps: typeof reps === 'string' ? reps : '8-12',
-        duration: Number(duration) || 15,
-        calories: Number(calories) || 100,
-        rating: Number(rating) || 4.5,
+        workout: {
+          ...fallbackWorkouts[index % fallbackWorkouts.length],
+          id: slugifyWorkout(resolvedName),
+          name: resolvedName,
+          category: Array.isArray(category) ? category.filter((value): value is string => typeof value === 'string') : [],
+          equipment: typeof equipment === 'string' ? equipment : 'Bodyweight',
+          difficulty: typeof difficulty === 'string' ? difficulty : 'Intermediate',
+          sets: Number(sets) || 3,
+          reps: typeof reps === 'string' ? reps : '8-12',
+          duration: Number(duration) || 15,
+          calories: Number(calories) || 100,
+          rating: Number(rating) || 4.5,
+        },
+        sortKey: index,
       }
     }
 
     if (!item || typeof item !== 'object') return null
-    const workout = item as Partial<Workout>
+    const workout = item as Partial<Workout> & { id?: string | number }
+    const resolvedName = typeof workout.name === 'string' ? workout.name : `Workout ${index + 1}`
     return {
-      ...fallbackWorkouts[index % fallbackWorkouts.length],
-      ...workout,
-      id: String(workout.id ?? index + 1),
-      image: workout.image && workoutImages[workout.name] ? workoutImages[workout.name] : fallbackWorkouts[index % fallbackWorkouts.length].image,
-      category: Array.isArray(workout.category) ? workout.category.filter((value): value is string => typeof value === 'string') : [],
+      workout: {
+        ...fallbackWorkouts[index % fallbackWorkouts.length],
+        ...workout,
+        id: slugifyWorkout(resolvedName),
+        image: workout.image && workoutImages[workout.name] ? workoutImages[workout.name] : fallbackWorkouts[index % fallbackWorkouts.length].image,
+        category: Array.isArray(workout.category) ? workout.category.filter((value): value is string => typeof value === 'string') : [],
+      },
+      // Prefer the API's own numeric id so the serial order is stable across requests.
+      sortKey: typeof workout.id === 'number' ? workout.id : (Number(workout.id) || canonicalOrder.get(slugifyWorkout(resolvedName)) || index),
     }
-  }).filter((workout): workout is Workout => Boolean(workout))
+  }).filter((entry): entry is { workout: Workout; sortKey: number } => Boolean(entry))
 
-  return normalized.length ? normalized : fallbackWorkouts
+  if (!normalized.length) return fallbackWorkouts
+
+  return normalized.sort((a, b) => a.sortKey - b.sortKey).map((entry) => entry.workout)
 }
 
 export async function getWorkouts() {
