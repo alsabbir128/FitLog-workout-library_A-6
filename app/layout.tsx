@@ -41,8 +41,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        {process.env.NODE_ENV === 'production' && <Analytics />}
         <PageTransition>{children}</PageTransition>
+        {process.env.NODE_ENV === 'production' && <Analytics />}
       
       </body>
     </html>
