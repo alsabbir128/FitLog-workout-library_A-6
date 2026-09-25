@@ -6,7 +6,6 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'FitLog — Train With Intent',
   description: 'A dark, no-nonsense workout library and training log.',
-  generator: 'v0.app',
   icons: {
     icon: [
       {
@@ -42,8 +41,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <PageTransition>{children}</PageTransition>
         {process.env.NODE_ENV === 'production' && <Analytics />}
+        <PageTransition>{children}</PageTransition>
+      
       </body>
     </html>
   )
